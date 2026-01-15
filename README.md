@@ -1,36 +1,83 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Codexa
 
-## Getting Started
+Codexa is an interactive code editor + snippet library built with Next.js, Clerk auth, and a Convex backend.
 
-First, run the development server:
+## Features
+
+- **In-browser code editor** (Monaco) with themes, language switching, and per-language local persistence
+- **Code execution** via the Piston API (`https://emkc.org/api/v2/piston/execute`)
+- **Share snippets** to a public library
+- **Snippet details** with read-only viewer, copy button, and comments
+- **Stars** for snippets + a profile page with stats and execution history
+- **Pro gating** (non-JavaScript languages require Pro; upgraded via Lemon Squeezy webhook)
+
+## Tech stack
+
+- **Next.js** (App Router) + **React**
+- **Tailwind CSS** + **Framer Motion**
+- **Clerk** for authentication
+- **Convex** for database + server functions
+- **Zustand** for client state
+
+## Getting started
+
+### 1) Install dependencies
+
+```bash
+npm install
+```
+
+### 2) Configure environment variables
+
+Copy `.env.example` to `.env.local` and fill in values:
+
+```bash
+copy .env.example .env.local
+```
+
+**Required variables**
+
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`
+- `CLERK_SECRET_KEY`
+- `CLERK_WEBHOOK_SECRET`
+- `CONVEX_DEPLOYMENT`
+- `NEXT_PUBLIC_CONVEX_URL`
+- `LEMON_SQUEEZY_WEBHOOK_SECRET`
+
+Note: any `NEXT_PUBLIC_*` env var is exposed to the browser.
+
+### 3) Run Convex (backend)
+
+In one terminal:
+
+```bash
+npx convex dev
+```
+
+### 4) Run Next.js (frontend)
+
+In another terminal:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Webhooks
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Convex HTTP routes are defined in `convex/http.ts`:
 
-## Learn More
+- **Clerk webhook**: `/clerk-webhook`
+  - Used to sync newly created Clerk users into the Convex `users` table.
+  - Requires `CLERK_WEBHOOK_SECRET`.
+- **Lemon Squeezy webhook**: `/lemon-squeezy-webhook`
+  - Used to upgrade users to Pro on `order_created`.
+  - Requires `LEMON_SQUEEZY_WEBHOOK_SECRET`.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **`npm run dev`**: start Next.js dev server
+- **`npm run build`**: build for production
+- **`npm run start`**: start production server
+- **`npm run lint`**: run ESLint
