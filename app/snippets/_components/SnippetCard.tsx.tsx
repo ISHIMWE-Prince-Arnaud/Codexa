@@ -5,7 +5,7 @@ import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
 
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { Clock, Trash2, User } from "lucide-react";
 import Image from "next/image";
@@ -16,18 +16,25 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
   const { user } = useUser();
   const deleteSnippet = useMutation(api.snippets.deleteSnippet);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-  const handleDelete = async () => {
+  const handleConfirmDelete = async () => {
     setIsDeleting(true);
 
     try {
       await deleteSnippet({ snippetId: snippet._id });
+      setShowDeleteConfirm(false);
     } catch (error) {
       console.log("Error deleting snippet:", error);
       toast.error("Error deleting snippet");
     } finally {
       setIsDeleting(false);
     }
+  };
+
+  const handleRequestDelete = () => {
+    if (isDeleting) return;
+    setShowDeleteConfirm(true);
   };
 
   return (
@@ -85,7 +92,7 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
                 {user?.id === snippet.userId && (
                   <div className="z-10" onClick={(e) => e.preventDefault()}>
                     <button
-                      onClick={handleDelete}
+                      onClick={handleRequestDelete}
                       disabled={isDeleting}
                       className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-lg transition-all duration-200
                                   ${
@@ -132,6 +139,65 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
           </div>
         </div>
       </Link>
+
+      <AnimatePresence>
+        {showDeleteConfirm && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+            role="dialog"
+            aria-modal="true"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => {
+              if (!isDeleting) setShowDeleteConfirm(false);
+            }}
+          >
+            <motion.div
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.98, y: 10 }}
+              transition={{ type: "spring", stiffness: 380, damping: 28 }}
+              className="relative w-full max-w-md rounded-2xl border border-[#313244] bg-[#0a0a0f] p-6 shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold text-white">Delete snippet</h3>
+                <p className="text-sm text-gray-400">This action cannot be undone.</p>
+              </div>
+
+              <div className="mt-6 flex items-center justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-200 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="px-4 py-2 rounded-lg bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-50"
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
