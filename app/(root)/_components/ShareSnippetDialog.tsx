@@ -3,9 +3,12 @@ import { useMutation } from "convex/react";
 import { useState } from "react";
 import { api } from "../../../convex/_generated/api";
 import { X } from "lucide-react";
+import { useClerk, useUser } from "@clerk/nextjs";
 import toast from "react-hot-toast";
 
 function ShareSnippetDialog({ onClose }: { onClose: () => void }) {
+  const clerk = useClerk();
+  const { isSignedIn } = useUser();
   const [title, setTitle] = useState("");
   const [isSharing, setIsSharing] = useState(false);
   const { language, getCode } = useCodeEditorStore();
@@ -13,6 +16,12 @@ function ShareSnippetDialog({ onClose }: { onClose: () => void }) {
 
   const handleShare = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isSignedIn) {
+      toast.error("Sign in to share snippets");
+      clerk.openSignIn();
+      return;
+    }
 
     setIsSharing(true);
 
