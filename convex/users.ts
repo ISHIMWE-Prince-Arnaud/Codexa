@@ -1,7 +1,7 @@
 import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, mutation, query } from "./_generated/server";
 
-export const syncUser = mutation({
+export const syncUser = internalMutation({
   args: {
     userId: v.string(),
     email: v.string(),
@@ -28,7 +28,13 @@ export const getUser = query({
   args: { userId: v.string() },
 
   handler: async (ctx, args) => {
-    if (!args.userId) return null;
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new Error("Not authenticated");
+
+    // Only allow users to query their own data
+    if (args.userId !== identity.subject) {
+      throw new Error("Unauthorized: can only query own user data");
+    }
 
     const user = await ctx.db
       .query("users")

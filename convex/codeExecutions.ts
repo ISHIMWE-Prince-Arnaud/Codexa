@@ -34,33 +34,38 @@ export const saveExecution = mutation({
 
 export const getUserExecutions = query({
   args: {
-    userId: v.string(),
     paginationOpts: paginationOptsValidator,
   },
   handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("Not authenticated");
+
     return await ctx.db
       .query("codeExecutions")
       .withIndex("by_user_id")
-      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .filter((q) => q.eq(q.field("userId"), identity.subject))
       .order("desc")
       .paginate(args.paginationOpts);
   },
 });
 
 export const getUserStats = query({
-  args: { userId: v.string() },
-  handler: async (ctx, args) => {
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("Not authenticated");
+
     const executions = await ctx.db
       .query("codeExecutions")
       .withIndex("by_user_id")
-      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .filter((q) => q.eq(q.field("userId"), identity.subject))
       .collect();
 
     // Get starred snippets
     const starredSnippets = await ctx.db
       .query("stars")
       .withIndex("by_user_id")
-      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .filter((q) => q.eq(q.field("userId"), identity.subject))
       .collect();
 
     // Get all starred snippet details to analyze languages
