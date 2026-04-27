@@ -57,6 +57,13 @@ export const upgradeToPro = mutation({
 
     if (!user) throw new Error("User not found");
 
+    // If user already has a customer ID, verify it matches
+    if (user.lemonSqueezyCustomerId) {
+      if (user.lemonSqueezyCustomerId !== args.lemonSqueezyCustomerId) {
+        throw new Error("Customer ID mismatch - possible account takeover attempt");
+      }
+    }
+
     await ctx.db.patch(user._id, {
       isPro: true,
       proSince: Date.now(),

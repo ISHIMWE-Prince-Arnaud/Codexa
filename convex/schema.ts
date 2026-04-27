@@ -10,7 +10,9 @@ export default defineSchema({
     proSince: v.optional(v.number()),
     lemonSqueezyCustomerId: v.optional(v.string()),
     lemonSqueezyOrderId: v.optional(v.string()),
-  }).index("by_user_id", ["userId"]),
+  })
+    .index("by_user_id", ["userId"])
+    .index("by_lemon_squeezy_customer_id", ["lemonSqueezyCustomerId"]),
 
   codeExecutions: defineTable({
     userId: v.string(),
