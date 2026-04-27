@@ -1,8 +1,10 @@
-export default {
+const config = {
   providers: [
     {
-      domain: "https://stirring-kitten-84.clerk.accounts.dev/",
+      domain: process.env.CLERK_DOMAIN,
       applicationID: "convex",
     },
   ],
 };
+
+export default config;

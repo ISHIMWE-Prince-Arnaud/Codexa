@@ -9,7 +9,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, Code, Grid, Layers, Search, Tag, X } from "lucide-react";
 import NavigationHeader from "@/components/NavigationHeader";
-import SnippetCard from "./_components/SnippetCard.tsx";
+import SnippetCard from "./_components/SnippetCard";
 
 function SnippetsPage() {
   const snippets = useQuery(api.snippets.getSnippets);
