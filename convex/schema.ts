@@ -32,7 +32,7 @@ export default defineSchema({
     snippetId: v.id("snippets"),
     userId: v.string(),
     userName: v.string(),
-    content: v.string(), // This will store HTML content
+    content: v.string(), // Stores plain text/markdown content (sanitized on server)
   }).index("by_snippet_id", ["snippetId"]),
 
   stars: defineTable({

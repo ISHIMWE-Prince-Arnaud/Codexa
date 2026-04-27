@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import sanitizeHtml from "sanitize-html";
 
 export const createSnippet = mutation({
   args: {
@@ -116,11 +117,17 @@ export const addComment = mutation({
 
     if (!user) throw new Error("User not found");
 
+    // Sanitize content to prevent XSS - strip all HTML tags
+    const sanitizedContent = sanitizeHtml(args.content, {
+      allowedTags: [],
+      allowedAttributes: {},
+    });
+
     return await ctx.db.insert("snippetComments", {
       snippetId: args.snippetId,
       userId: identity.subject,
       userName: user.name,
-      content: args.content,
+      content: sanitizedContent,
     });
   },
 });
