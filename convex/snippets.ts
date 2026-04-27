@@ -80,6 +80,7 @@ export const starSnippet = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
+    // Use compound index to find existing star
     const existing = await ctx.db
       .query("stars")
       .withIndex("by_user_id_and_snippet_id")
@@ -90,12 +91,24 @@ export const starSnippet = mutation({
       .first();
 
     if (existing) {
+      // Unstar: delete the existing star
       await ctx.db.delete(existing._id);
+      return { starred: false };
     } else {
-      await ctx.db.insert("stars", {
-        userId: identity.subject,
-        snippetId: args.snippetId,
-      });
+      // Star: insert new star. The unique index prevents duplicates.
+      try {
+        await ctx.db.insert("stars", {
+          userId: identity.subject,
+          snippetId: args.snippetId,
+        });
+        return { starred: true };
+      } catch (error) {
+        // Handle race condition: if another concurrent call already inserted, treat as success
+        if (error instanceof Error && "code" in error && error.code === "DUPLICATE_ENTRY") {
+          return { starred: true };
+        }
+        throw error;
+      }
     }
   },
 });
@@ -151,9 +164,12 @@ export const deleteComment = mutation({
 });
 
 export const getSnippets = query({
-  handler: async (ctx) => {
-    const snippets = await ctx.db.query("snippets").order("desc").collect();
-    return snippets;
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 100;
+    return await ctx.db.query("snippets").order("desc").take(limit);
   },
 });
 

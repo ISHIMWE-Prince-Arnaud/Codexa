@@ -11,8 +11,10 @@ import { BookOpen, Code, Grid, Layers, Search, Tag, X } from "lucide-react";
 import NavigationHeader from "@/components/NavigationHeader";
 import SnippetCard from "./_components/SnippetCard";
 
+const SNIPPETS_LIMIT = 100;
+
 function SnippetsPage() {
-  const snippets = useQuery(api.snippets.getSnippets);
+  const snippets = useQuery(api.snippets.getSnippets, { limit: SNIPPETS_LIMIT });
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null);
   const [view, setView] = useState<"grid" | "list">("grid");
