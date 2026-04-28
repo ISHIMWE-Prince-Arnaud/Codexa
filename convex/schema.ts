@@ -44,4 +44,11 @@ export default defineSchema({
     .index("by_user_id", ["userId"])
     .index("by_snippet_id", ["snippetId"])
     .index("by_user_id_and_snippet_id", ["userId", "snippetId"]),
+
+  rateLimits: defineTable({
+    userId: v.string(),
+    action: v.string(), // e.g. "createSnippet", "addComment", etc.
+    count: v.number(),
+    windowStart: v.number(), // timestamp when the current window started
+  }).index("by_user_id_and_action", ["userId", "action"]),
 });

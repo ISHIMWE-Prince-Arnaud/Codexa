@@ -1,6 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import { paginationOptsValidator } from "convex/server";
+import { checkRateLimit } from "./rateLimit";
 
 export const saveExecution = mutation({
   args: {
@@ -13,6 +14,9 @@ export const saveExecution = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Not authenticated");
+
+    // Check rate limit
+    await checkRateLimit(ctx.db, identity.subject, "saveExecution");
 
     // check pro status
     const user = await ctx.db

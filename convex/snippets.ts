@@ -2,6 +2,7 @@ import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import sanitizeHtml from "sanitize-html";
+import { checkRateLimit } from "./rateLimit";
 
 export const createSnippet = mutation({
   args: {
@@ -16,6 +17,9 @@ export const createSnippet = mutation({
     // Validate input lengths
     if (args.title.length > 200) throw new Error("Title must be less than 200 characters");
     if (args.code.length > 50000) throw new Error("Code must be less than 50KB");
+
+    // Check rate limit
+    await checkRateLimit(ctx.db, identity.subject, "createSnippet");
 
     const user = await ctx.db
       .query("users")
@@ -93,6 +97,9 @@ export const starSnippet = mutation({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
 
+    // Check rate limit
+    await checkRateLimit(ctx.db, identity.subject, "starSnippet");
+
     // Use compound index to find existing star
     const existing = await ctx.db
       .query("stars")
@@ -134,6 +141,9 @@ export const addComment = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+
+    // Check rate limit
+    await checkRateLimit(ctx.db, identity.subject, "addComment");
 
     const user = await ctx.db
       .query("users")
