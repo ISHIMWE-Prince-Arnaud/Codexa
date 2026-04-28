@@ -22,12 +22,25 @@ export default defineSchema({
     error: v.optional(v.string()),
   }).index("by_user_id", ["userId"]),
 
+  // Denormalized user stats for efficient retrieval without loading all executions
+  userStats: defineTable({
+    userId: v.string(),
+    totalExecutions: v.number(),
+    last24Hours: v.number(),
+    languages: v.array(v.string()), // List of used languages
+    languageCounts: v.record(v.string(), v.number()), // language -> count
+    favoriteLanguage: v.string(),
+    mostStarredLanguage: v.string(),
+    lastExecutionAt: v.number(), // timestamp of last execution for 24h window calculation
+  }).index("by_user_id", ["userId"]),
+
   snippets: defineTable({
     userId: v.string(),
     title: v.string(),
     language: v.string(),
     code: v.string(),
     userName: v.string(), // store user's name for easy access
+    starCount: v.optional(v.number()), // denormalized star count
   }).index("by_user_id", ["userId"]),
 
   snippetComments: defineTable({
@@ -40,6 +53,11 @@ export default defineSchema({
   stars: defineTable({
     userId: v.string(),
     snippetId: v.id("snippets"),
+    // Denormalized snippet data to avoid N+1 queries in getStarredSnippets
+    snippetTitle: v.optional(v.string()),
+    snippetLanguage: v.optional(v.string()),
+    snippetCode: v.optional(v.string()),
+    snippetUserName: v.optional(v.string()),
   })
     .index("by_user_id", ["userId"])
     .index("by_snippet_id", ["snippetId"])

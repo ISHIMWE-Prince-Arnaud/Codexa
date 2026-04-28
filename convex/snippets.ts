@@ -41,6 +41,7 @@ export const createSnippet = mutation({
       title: args.title,
       language: args.language,
       code: args.code,
+      starCount: 0, // Initialize denormalized star count
     });
 
     return snippetId;
@@ -116,6 +117,10 @@ export const starSnippet = mutation({
     // Check rate limit
     await checkRateLimit(ctx.db, identity.subject, "starSnippet");
 
+    // Get snippet details for denormalization
+    const snippet = await ctx.db.get(args.snippetId);
+    if (!snippet) throw new Error("Snippet not found");
+
     // Use compound index to find existing star
     const existing = await ctx.db
       .query("stars")
@@ -127,20 +132,28 @@ export const starSnippet = mutation({
       .first();
 
     if (existing) {
-      // Unstar: delete the existing star
+      // Unstar: delete the existing star and decrement count
       await ctx.db.delete(existing._id);
+      const newCount = (snippet.starCount || 1) - 1;
+      await ctx.db.patch(args.snippetId, { starCount: Math.max(0, newCount) });
       return { starred: false };
     } else {
-      // Star: insert new star. The unique index prevents duplicates.
+      // Star: insert new star with denormalized data and increment count
       try {
         await ctx.db.insert("stars", {
           userId: identity.subject,
           snippetId: args.snippetId,
+          snippetTitle: snippet.title,
+          snippetLanguage: snippet.language,
+          snippetCode: snippet.code,
+          snippetUserName: snippet.userName,
         });
+        const newCount = (snippet.starCount || 0) + 1;
+        await ctx.db.patch(args.snippetId, { starCount: newCount });
         return { starred: true };
       } catch (error) {
         // Handle race condition: if another concurrent call already inserted, treat as success
-        if (error instanceof Error && "code" in error && error.code === "DUPLICATE_ENTRY") {
+        if (error instanceof Error && "code" in error && (error as { code?: string }).code === "DUPLICATE_ENTRY") {
           return { starred: true };
         }
         throw error;
@@ -263,13 +276,11 @@ export const isSnippetStarred = query({
 export const getSnippetStarCount = query({
   args: { snippetId: v.id("snippets") },
   handler: async (ctx, args) => {
-    const stars = await ctx.db
-      .query("stars")
-      .withIndex("by_snippet_id")
-      .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-      .collect();
+    const snippet = await ctx.db.get(args.snippetId);
+    if (!snippet) return 0;
 
-    return stars.length;
+    // Use denormalized starCount for O(1) lookup instead of O(N) collection scan
+    return snippet.starCount || 0;
   },
 });
 
@@ -284,8 +295,19 @@ export const getStarredSnippets = query({
       .filter((q) => q.eq(q.field("userId"), identity.subject))
       .collect();
 
-    const snippets = await Promise.all(stars.map((star) => ctx.db.get(star.snippetId)));
-
-    return snippets.filter((s): s is Doc<"snippets"> => s !== null);
+    // Use denormalized data from stars to avoid N+1 queries
+    // Reconstruct snippet-like objects from denormalized star data
+    return stars
+      .filter((star) => star.snippetTitle !== undefined) // Only include stars with denormalized data
+      .map((star) => ({
+        _id: star.snippetId,
+        _creationTime: star._creationTime,
+        userId: star.snippetUserName || "", // Store author name in userId field for compatibility
+        title: star.snippetTitle || "",
+        language: star.snippetLanguage || "",
+        code: star.snippetCode || "",
+        userName: star.snippetUserName || "",
+        starCount: undefined, // Not needed for starred snippets view
+      })) as Doc<"snippets">[];
   },
 });

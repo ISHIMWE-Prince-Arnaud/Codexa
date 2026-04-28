@@ -33,6 +33,62 @@ export const saveExecution = mutation({
       ...args,
       userId: identity.subject,
     });
+
+    // Update denormalized user stats
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+
+    const existingStats = await ctx.db
+      .query("userStats")
+      .withIndex("by_user_id")
+      .filter((q) => q.eq(q.field("userId"), identity.subject))
+      .first();
+
+    if (!existingStats) {
+      // First execution - create initial stats
+      await ctx.db.insert("userStats", {
+        userId: identity.subject,
+        totalExecutions: 1,
+        last24Hours: 1,
+        languages: [args.language],
+        languageCounts: { [args.language]: 1 },
+        favoriteLanguage: args.language,
+        mostStarredLanguage: "N/A", // Will be updated by getUserStats if needed
+        lastExecutionAt: now,
+      });
+    } else {
+      // Update existing stats
+      const newTotal = existingStats.totalExecutions + 1;
+
+      // Calculate last24Hours: reset if last execution was > 24h ago, otherwise increment
+      const newLast24Hours = existingStats.lastExecutionAt < oneDayAgo
+        ? 1
+        : existingStats.last24Hours + 1;
+
+      // Update language counts
+      const newLanguageCounts = { ...existingStats.languageCounts };
+      newLanguageCounts[args.language] = (newLanguageCounts[args.language] || 0) + 1;
+
+      // Update languages list
+      const newLanguages = existingStats.languages.includes(args.language)
+        ? existingStats.languages
+        : [...existingStats.languages, args.language];
+
+      // Calculate favorite language
+      const favoriteLanguage = Object.entries(newLanguageCounts).reduce(
+        (favorite, [lang, count]) => count > (newLanguageCounts[favorite] || 0) ? lang : favorite,
+        args.language
+      );
+
+      await ctx.db.patch(existingStats._id, {
+        totalExecutions: newTotal,
+        last24Hours: newLast24Hours,
+        languages: newLanguages,
+        languageCounts: newLanguageCounts,
+        favoriteLanguage,
+        lastExecutionAt: now,
+      });
+    }
   },
 });
 
@@ -59,30 +115,38 @@ export const getUserStats = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Not authenticated");
 
-    // Limit to most recent 1000 executions to avoid loading all records into memory
-    const executions = await ctx.db
-      .query("codeExecutions")
+    // Get denormalized stats - O(1) lookup instead of loading all executions
+    const stats = await ctx.db
+      .query("userStats")
       .withIndex("by_user_id")
       .filter((q) => q.eq(q.field("userId"), identity.subject))
-      .order("desc")
-      .take(1000);
+      .first();
 
-    // Get starred snippets
+    if (!stats) {
+      // No executions yet
+      return {
+        totalExecutions: 0,
+        languagesCount: 0,
+        languages: [],
+        last24Hours: 0,
+        favoriteLanguage: "N/A",
+        languageStats: {},
+        mostStarredLanguage: "N/A",
+      };
+    }
+
+    // Calculate most starred language from stars table
     const starredSnippets = await ctx.db
       .query("stars")
       .withIndex("by_user_id")
       .filter((q) => q.eq(q.field("userId"), identity.subject))
       .collect();
 
-    // Get all starred snippet details to analyze languages
-    const snippetIds = starredSnippets.map((star) => star.snippetId);
-    const snippetDetails = await Promise.all(snippetIds.map((id) => ctx.db.get(id)));
-
-    // Calculate most starred language
-    const starredLanguages = snippetDetails.filter(Boolean).reduce(
-      (acc, curr) => {
-        if (curr?.language) {
-          acc[curr.language] = (acc[curr.language] || 0) + 1;
+    // Use denormalized snippetLanguage from stars table instead of N+1 queries
+    const starredLanguages = starredSnippets.reduce(
+      (acc, star) => {
+        if (star.snippetLanguage) {
+          acc[star.snippetLanguage] = (acc[star.snippetLanguage] || 0) + 1;
         }
         return acc;
       },
@@ -92,31 +156,13 @@ export const getUserStats = query({
     const mostStarredLanguage =
       Object.entries(starredLanguages).sort(([, a], [, b]) => b - a)[0]?.[0] ?? "N/A";
 
-    // Calculate execution stats
-    const last24Hours = executions.filter(
-      (e) => e._creationTime > Date.now() - 24 * 60 * 60 * 1000
-    ).length;
-
-    const languageStats = executions.reduce(
-      (acc, curr) => {
-        acc[curr.language] = (acc[curr.language] || 0) + 1;
-        return acc;
-      },
-      {} as Record<string, number>
-    );
-
-    const languages = Object.keys(languageStats);
-    const favoriteLanguage = languages.length
-      ? languages.reduce((a, b) => (languageStats[a] > languageStats[b] ? a : b))
-      : "N/A";
-
     return {
-      totalExecutions: executions.length,
-      languagesCount: languages.length,
-      languages: languages,
-      last24Hours,
-      favoriteLanguage,
-      languageStats,
+      totalExecutions: stats.totalExecutions,
+      languagesCount: stats.languages.length,
+      languages: stats.languages,
+      last24Hours: stats.last24Hours,
+      favoriteLanguage: stats.favoriteLanguage,
+      languageStats: stats.languageCounts,
       mostStarredLanguage,
     };
   },
