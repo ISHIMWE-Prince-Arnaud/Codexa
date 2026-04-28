@@ -19,15 +19,15 @@ export const saveExecution = mutation({
     // Check rate limit
     await checkRateLimit(ctx.db, identity.subject, "saveExecution");
 
-    // check pro status
-    const user = await ctx.db
-      .query("users")
-      .withIndex("by_user_id")
-      .filter((q) => q.eq(q.field("userId"), identity.subject))
-      .first();
+    // Check Pro status for non-JavaScript languages using shared helper
+    if (args.language !== "javascript") {
+      const isPro = await ctx.runQuery(api.internal.users.isProUser, {
+        userId: identity.subject,
+      });
 
-    if (!user?.isPro && args.language !== "javascript") {
-      throw new ConvexError("Pro subscription required to use this language");
+      if (!isPro) {
+        throw new ConvexError("Pro subscription required to use this language");
+      }
     }
 
     await ctx.db.insert("codeExecutions", {
