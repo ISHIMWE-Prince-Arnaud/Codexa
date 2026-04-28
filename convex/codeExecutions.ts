@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import { mutation, query } from "./_generated/server";
-import { api } from "./_generated/api";
+import { internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
 import { checkRateLimit } from "./rateLimit";
 
@@ -21,7 +21,7 @@ export const saveExecution = mutation({
 
     // Check Pro status for non-JavaScript languages using shared helper
     if (args.language !== "javascript") {
-      const isPro = await ctx.runQuery(api.internal.users.isProUser, {
+      const isPro = await ctx.runQuery(internal.users.isProUser, {
         userId: identity.subject,
       });
 
