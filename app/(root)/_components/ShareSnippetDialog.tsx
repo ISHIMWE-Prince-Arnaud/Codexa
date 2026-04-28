@@ -5,6 +5,7 @@ import { api } from "../../../convex/_generated/api";
 import { X } from "lucide-react";
 import { useClerk, useUser } from "@clerk/nextjs";
 import toast from "react-hot-toast";
+import { SupportedLanguage } from "../_constants";
 
 function ShareSnippetDialog({ onClose }: { onClose: () => void }) {
   const clerk = useClerk();
@@ -27,7 +28,7 @@ function ShareSnippetDialog({ onClose }: { onClose: () => void }) {
 
     try {
       const code = getCode();
-      await createSnippet({ title, language, code });
+      await createSnippet({ title, language: language as SupportedLanguage, code });
       onClose();
       setTitle("");
       toast.success("Snippet shared successfully");
