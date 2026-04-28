@@ -1,10 +1,10 @@
 import { ConvexError, v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 import { internal } from "./_generated/api";
 import { paginationOptsValidator } from "convex/server";
 import { checkRateLimit } from "./rateLimit";
 
-export const saveExecution = mutation({
+export const saveExecution = internalMutation({
   args: {
     language: v.string(),
     code: v.string(),

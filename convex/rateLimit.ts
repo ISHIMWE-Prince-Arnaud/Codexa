@@ -95,3 +95,30 @@ export const checkRateLimitInternal = internalMutation({
     await checkRateLimit(ctx.db, args.userId, args.action);
   },
 });
+
+/**
+ * Cron job to purge old rate limit entries.
+ * Deletes entries older than 5 minutes (well beyond the 60s rate limit window).
+ */
+export const purgeOldRateLimits = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+
+    // Get all rate limit entries older than 5 minutes
+    const oldEntries = await ctx.db
+      .query("rateLimits")
+      .withIndex("by_user_id_and_action_timestamp")
+      .filter((q) => q.lt(q.field("timestamp"), fiveMinutesAgo))
+      .collect();
+
+    // Delete in batches to avoid overwhelming the database
+    const BATCH_SIZE = 100;
+    for (let i = 0; i < oldEntries.length; i += BATCH_SIZE) {
+      const batch = oldEntries.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map((entry) => ctx.db.delete(entry._id)));
+    }
+
+    return { deleted: oldEntries.length };
+  },
+});

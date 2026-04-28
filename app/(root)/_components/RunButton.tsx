@@ -1,30 +1,19 @@
 "use client";
 
-import { getExecutionResult, useCodeEditorStore } from "@/store/useCodeEditorStore";
-import { useUser } from "@clerk/nextjs";
-import { useAction, useMutation } from "convex/react";
+import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { motion } from "framer-motion";
 import { Loader2, Play } from "lucide-react";
+import { useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 
 function RunButton() {
-  const { user } = useUser();
-  const { runCode, language, isRunning } = useCodeEditorStore();
-  const saveExecution = useMutation(api.codeExecutions.saveExecution);
-  const executeCode = useAction(api.actions.executeCode);
+  const { runCode, isRunning } = useCodeEditorStore();
+  // Use executeAndSaveCode which combines execution + saving (internalMutation)
+  // This prevents clients from bypassing Pro-gating by directly calling saveExecution
+  const executeAndSaveCode = useAction(api.actions.executeAndSaveCode);
 
   const handleRun = async () => {
-    await runCode(executeCode);
-    const result = getExecutionResult();
-
-    if (user && result) {
-      await saveExecution({
-        language,
-        code: result.code,
-        output: result.output || undefined,
-        error: result.error || undefined,
-      });
-    }
+    await runCode(executeAndSaveCode);
   };
 
   return (

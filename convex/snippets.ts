@@ -1,5 +1,5 @@
-import { v } from "convex/values";
-import { mutation, query } from "./_generated/server";
+import { ConvexError, v } from "convex/values";
+import { internalMutation, mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import sanitizeHtml from "sanitize-html";
 import { checkRateLimit } from "./rateLimit";
@@ -18,11 +18,11 @@ export const createSnippet = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     // Validate input lengths
-    if (args.title.length > 200) throw new Error("Title must be less than 200 characters");
-    if (args.code.length > 50000) throw new Error("Code must be less than 50KB");
+    if (args.title.length > 200) throw new ConvexError("Title must be less than 200 characters");
+    if (args.code.length > 50000) throw new ConvexError("Code must be less than 50KB");
 
     // Check rate limit
     await checkRateLimit(ctx.db, identity.subject, "createSnippet");
@@ -33,7 +33,7 @@ export const createSnippet = mutation({
       .filter((q) => q.eq(q.field("userId"), identity.subject))
       .first();
 
-    if (!user) throw new Error("User not found");
+    if (!user) throw new ConvexError("User not found");
 
     const snippetId = await ctx.db.insert("snippets", {
       userId: identity.subject,
@@ -55,54 +55,106 @@ export const deleteSnippet = mutation({
 
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     const snippet = await ctx.db.get(args.snippetId);
-    if (!snippet) throw new Error("Snippet not found");
+    if (!snippet) throw new ConvexError("Snippet not found");
 
     if (snippet.userId !== identity.subject) {
-      throw new Error("Not authorized to delete this snippet");
+      throw new ConvexError("Not authorized to delete this snippet");
     }
 
-    try {
-      // Delete all comments in batches to prevent orphaning
-      const BATCH_SIZE = 100;
-      let hasMoreComments = true;
-      while (hasMoreComments) {
-        const comments = await ctx.db
-          .query("snippetComments")
-          .withIndex("by_snippet_id")
-          .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-          .take(BATCH_SIZE);
+    // Delete all comments in batches to prevent orphaning
+    // Convex mutations are atomic — if anything fails, all changes are rolled back
+    const BATCH_SIZE = 100;
+    let hasMoreComments = true;
+    while (hasMoreComments) {
+      const comments = await ctx.db
+        .query("snippetComments")
+        .withIndex("by_snippet_id")
+        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+        .take(BATCH_SIZE);
 
-        for (const comment of comments) {
-          await ctx.db.delete(comment._id);
-        }
-
-        hasMoreComments = comments.length === BATCH_SIZE;
+      for (const comment of comments) {
+        await ctx.db.delete(comment._id);
       }
 
-      // Delete all stars in batches to prevent orphaning
-      let hasMoreStars = true;
-      while (hasMoreStars) {
-        const stars = await ctx.db
-          .query("stars")
-          .withIndex("by_snippet_id")
-          .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-          .take(BATCH_SIZE);
-
-        for (const star of stars) {
-          await ctx.db.delete(star._id);
-        }
-
-        hasMoreStars = stars.length === BATCH_SIZE;
-      }
-
-      // Delete the snippet last - if this fails, the mutation is atomic and all changes are rolled back
-      await ctx.db.delete(args.snippetId);
-    } catch (error) {
-      throw new Error(`Failed to delete snippet: ${error instanceof Error ? error.message : String(error)}`);
+      hasMoreComments = comments.length === BATCH_SIZE;
     }
+
+    // Delete all stars in batches to prevent orphaning
+    let hasMoreStars = true;
+    while (hasMoreStars) {
+      const stars = await ctx.db
+        .query("stars")
+        .withIndex("by_snippet_id")
+        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+        .take(BATCH_SIZE);
+
+      for (const star of stars) {
+        await ctx.db.delete(star._id);
+      }
+
+      hasMoreStars = stars.length === BATCH_SIZE;
+    }
+
+    // Delete the snippet last
+    await ctx.db.delete(args.snippetId);
+  },
+});
+
+export const updateSnippet = mutation({
+  args: {
+    snippetId: v.id("snippets"),
+    title: v.string(),
+    language: languageValidator,
+    code: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) throw new ConvexError("Not authenticated");
+
+    const snippet = await ctx.db.get(args.snippetId);
+    if (!snippet) throw new ConvexError("Snippet not found");
+
+    if (snippet.userId !== identity.subject) {
+      throw new ConvexError("Not authorized to update this snippet");
+    }
+
+    // Validate input lengths
+    if (args.title.length > 200) throw new ConvexError("Title must be less than 200 characters");
+    if (args.code.length > 50000) throw new ConvexError("Code must be less than 50KB");
+
+    // Update the snippet
+    await ctx.db.patch(args.snippetId, {
+      title: args.title,
+      language: args.language,
+      code: args.code,
+    });
+
+    // Update denormalized data in all stars for this snippet
+    // This ensures starred snippets show up-to-date information
+    const BATCH_SIZE = 100;
+    let hasMoreStars = true;
+    while (hasMoreStars) {
+      const stars = await ctx.db
+        .query("stars")
+        .withIndex("by_snippet_id")
+        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+        .take(BATCH_SIZE);
+
+      for (const star of stars) {
+        await ctx.db.patch(star._id, {
+          snippetTitle: args.title,
+          snippetLanguage: args.language,
+          snippetCode: args.code,
+        });
+      }
+
+      hasMoreStars = stars.length === BATCH_SIZE;
+    }
+
+    return { success: true };
   },
 });
 
@@ -112,14 +164,14 @@ export const starSnippet = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     // Check rate limit
     await checkRateLimit(ctx.db, identity.subject, "starSnippet");
 
     // Get snippet details for denormalization
     const snippet = await ctx.db.get(args.snippetId);
-    if (!snippet) throw new Error("Snippet not found");
+    if (!snippet) throw new ConvexError("Snippet not found");
 
     // Use compound index to find existing star
     const existing = await ctx.db
@@ -156,7 +208,7 @@ export const starSnippet = mutation({
         if (error instanceof Error && "code" in error && (error as { code?: string }).code === "DUPLICATE_ENTRY") {
           return { starred: true };
         }
-        throw error;
+        throw new ConvexError(`Failed to star snippet: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
   },
@@ -169,7 +221,7 @@ export const addComment = mutation({
   },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     // Check rate limit
     await checkRateLimit(ctx.db, identity.subject, "addComment");
@@ -180,10 +232,10 @@ export const addComment = mutation({
       .filter((q) => q.eq(q.field("userId"), identity.subject))
       .first();
 
-    if (!user) throw new Error("User not found");
+    if (!user) throw new ConvexError("User not found");
 
     // Validate content length
-    if (args.content.length > 5000) throw new Error("Comment must be less than 5000 characters");
+    if (args.content.length > 5000) throw new ConvexError("Comment must be less than 5000 characters");
 
     // Sanitize content to prevent XSS - strip all HTML tags
     const sanitizedContent = sanitizeHtml(args.content, {
@@ -204,14 +256,14 @@ export const deleteComment = mutation({
   args: { commentId: v.id("snippetComments") },
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
-    if (!identity) throw new Error("Not authenticated");
+    if (!identity) throw new ConvexError("Not authenticated");
 
     const comment = await ctx.db.get(args.commentId);
-    if (!comment) throw new Error("Comment not found");
+    if (!comment) throw new ConvexError("Comment not found");
 
     // Check if the user is the comment author
     if (comment.userId !== identity.subject) {
-      throw new Error("Not authorized to delete this comment");
+      throw new ConvexError("Not authorized to delete this comment");
     }
 
     await ctx.db.delete(args.commentId);
@@ -224,7 +276,17 @@ export const getSnippets = query({
   },
   handler: async (ctx, args) => {
     const limit = args.limit ?? 100;
-    return await ctx.db.query("snippets").order("desc").take(limit);
+    const snippets = await ctx.db.query("snippets").order("desc").take(limit);
+
+    // Get authenticated user's identity to compute isOwner
+    const identity = await ctx.auth.getUserIdentity();
+    const currentUserId = identity?.subject;
+
+    // Return snippets with isOwner computed, not raw userId
+    return snippets.map((snippet) => ({
+      ...snippet,
+      isOwner: snippet.userId === currentUserId,
+    }));
   },
 });
 
@@ -232,9 +294,17 @@ export const getSnippetById = query({
   args: { snippetId: v.id("snippets") },
   handler: async (ctx, args) => {
     const snippet = await ctx.db.get(args.snippetId);
-    if (!snippet) throw new Error("Snippet not found");
+    if (!snippet) throw new ConvexError("Snippet not found");
 
-    return snippet;
+    // Get authenticated user's identity to compute isOwner
+    const identity = await ctx.auth.getUserIdentity();
+    const isOwner = snippet.userId === identity?.subject;
+
+    // Return snippet with isOwner computed, not raw userId
+    return {
+      ...snippet,
+      isOwner,
+    };
   },
 });
 
@@ -295,19 +365,73 @@ export const getStarredSnippets = query({
       .filter((q) => q.eq(q.field("userId"), identity.subject))
       .collect();
 
-    // Use denormalized data from stars to avoid N+1 queries
-    // Reconstruct snippet-like objects from denormalized star data
-    return stars
-      .filter((star) => star.snippetTitle !== undefined) // Only include stars with denormalized data
-      .map((star) => ({
-        _id: star.snippetId,
-        _creationTime: star._creationTime,
-        userId: star.snippetUserName || "", // Store author name in userId field for compatibility
-        title: star.snippetTitle || "",
-        language: star.snippetLanguage || "",
-        code: star.snippetCode || "",
-        userName: star.snippetUserName || "",
-        starCount: undefined, // Not needed for starred snippets view
-      })) as Doc<"snippets">[];
+    // Fetch live snippet data instead of using potentially stale denormalized data
+    // This ensures deleted snippets are filtered out and edits are reflected
+    const snippets = await Promise.all(
+      stars.map(async (star) => {
+        const snippet = await ctx.db.get(star.snippetId);
+        return snippet;
+      })
+    );
+
+    // Filter out deleted snippets and map to response format with isOwner
+    return snippets
+      .filter((snippet): snippet is NonNullable<typeof snippet> => snippet !== null)
+      .map((snippet) => ({
+        ...snippet,
+        isOwner: snippet.userId === identity.subject,
+      }));
+  },
+});
+
+/**
+ * Reconciles denormalized starCount with actual star counts.
+ * Safety net for any drift between starCount and actual star count.
+ * Processes in batches to avoid overwhelming the database.
+ */
+export const reconcileStarCounts = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    const BATCH_SIZE = 100;
+    let cursor: string | undefined;
+    let reconciled = 0;
+    let checked = 0;
+
+    // Paginate through all snippets
+    while (true) {
+      const page = await ctx.db
+        .query("snippets")
+        .paginate({
+          cursor,
+          numItems: BATCH_SIZE,
+        });
+
+      for (const snippet of page.page) {
+        checked++;
+
+        // Count actual stars for this snippet
+        const stars = await ctx.db
+          .query("stars")
+          .withIndex("by_snippet_id")
+          .filter((q) => q.eq(q.field("snippetId"), snippet._id))
+          .collect();
+
+        const actualCount = stars.length;
+        const denormalizedCount = snippet.starCount || 0;
+
+        // Fix if there's a mismatch
+        if (actualCount !== denormalizedCount) {
+          await ctx.db.patch(snippet._id, { starCount: actualCount });
+          reconciled++;
+        }
+      }
+
+      if (!page.continueCursor || !page.isDone) {
+        break;
+      }
+      cursor = page.continueCursor;
+    }
+
+    return { checked, reconciled };
   },
 });

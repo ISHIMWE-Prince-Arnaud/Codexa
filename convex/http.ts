@@ -41,20 +41,24 @@ http.route({
       return new Response("Error occurred", { status: 400 });
     }
 
-    // Check for duplicate events (idempotency)
+    // Atomically check and record event to prevent duplicate processing
     const clerkEventId = (evt.data as { id?: string }).id ?? svix_id ?? evt.type;
     const eventId = `clerk:${clerkEventId}`;
 
-    const alreadyProcessed = await ctx.runQuery(internal.webhookHelpers.checkWebhookEvent, {
+    const eventType = evt.type;
+
+    // Record event first (atomic insert-or-return)
+    const { alreadyProcessed } = await ctx.runMutation(internal.webhookHelpers.recordWebhookEventIfNew, {
       eventId,
       provider: "clerk",
+      eventType,
     });
 
     if (alreadyProcessed) {
       return new Response("Already processed", { status: 200 });
     }
 
-    const eventType = evt.type;
+    // Process the event
     if (eventType === "user.created" || eventType === "user.updated") {
       // save the user to convex db (or update if existing)
       const data = evt.data as { id: string; email_addresses: { email_address: string }[]; first_name?: string; last_name?: string };
@@ -73,13 +77,6 @@ http.route({
         return new Response("Error syncing user", { status: 500 });
       }
     }
-
-    // Record that we've processed this event
-    await ctx.runMutation(internal.webhookHelpers.recordWebhookEvent, {
-      eventId,
-      provider: "clerk",
-      eventType,
-    });
 
     return new Response("Webhook processed successfully", { status: 200 });
   }),
@@ -102,20 +99,23 @@ http.route({
         signature,
       });
 
-      // Check for duplicate events (idempotency)
+      // Atomically check and record event to prevent duplicate processing
       const payloadData = payload as { meta: { event_id?: string; event_name: string }; data: { id: string; attributes: { user_email: string; customer_id: number; total: number } } };
       const lemonEventId = payloadData.meta.event_id ?? payloadData.data.id ?? signature.slice(0, 16);
       const eventId = `lemon-squeezy:${lemonEventId}`;
 
-      const alreadyProcessed = await ctx.runQuery(internal.webhookHelpers.checkWebhookEvent, {
+      // Record event first (atomic insert-or-return)
+      const { alreadyProcessed } = await ctx.runMutation(internal.webhookHelpers.recordWebhookEventIfNew, {
         eventId,
         provider: "lemon-squeezy",
+        eventType: payloadData.meta.event_name,
       });
 
       if (alreadyProcessed) {
         return new Response("Already processed", { status: 200 });
       }
 
+      // Process the event
       if (payloadData.meta.event_name === "order_created") {
         const { data } = payloadData;
 
@@ -130,13 +130,6 @@ http.route({
           // optionally do anything here
         }
       }
-
-      // Record that we've processed this event
-      await ctx.runMutation(internal.webhookHelpers.recordWebhookEvent, {
-        eventId,
-        provider: "lemon-squeezy",
-        eventType: payloadData.meta.event_name,
-      });
 
       return new Response("Webhook processed successfully", { status: 200 });
     } catch {

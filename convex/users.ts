@@ -65,12 +65,16 @@ export const upgradeToPro = internalMutation({
     amount: v.number(),
   },
   handler: async (ctx, args) => {
-    const user = await ctx.db
+    const users = await ctx.db
       .query("users")
+      .withIndex("by_email")
       .filter((q) => q.eq(q.field("email"), args.email))
-      .first();
+      .collect();
 
-    if (!user) throw new Error("User not found");
+    if (users.length === 0) throw new Error("User not found");
+    if (users.length > 1) throw new Error("Multiple users found with the same email — cannot determine which to upgrade");
+
+    const user = users[0];
 
     // If user already has a customer ID, verify it matches
     if (user.lemonSqueezyCustomerId) {

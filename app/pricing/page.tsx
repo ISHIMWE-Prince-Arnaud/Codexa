@@ -11,10 +11,10 @@ import { SignedIn, SignedOut } from "@clerk/nextjs";
 import UpgradeButton from "./_components/UpgradeButton";
 import LoginButton from "@/components/LoginButton";
 
-// Singleton Convex client to avoid creating new connections on every render
-const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
-
 async function PricingPage() {
+  // Create Convex client inside the function to avoid issues with Next.js bundling
+  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
   const user = await currentUser();
   const convexUser = user
     ? await convex.query(api.users.getUser, {

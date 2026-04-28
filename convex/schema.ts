@@ -7,11 +7,13 @@ export default defineSchema({
     email: v.string(),
     name: v.string(),
     isPro: v.boolean(),
+    isAdmin: v.optional(v.boolean()), // Defaults to false (undefined)
     proSince: v.optional(v.number()),
     lemonSqueezyCustomerId: v.optional(v.string()),
     lemonSqueezyOrderId: v.optional(v.string()),
   })
     .index("by_user_id", ["userId"])
+    .index("by_email", ["email"])
     .index("by_lemon_squeezy_customer_id", ["lemonSqueezyCustomerId"]),
 
   codeExecutions: defineTable({
@@ -77,4 +79,12 @@ export default defineSchema({
     processedAt: v.number(),
   }).index("by_event_id", ["eventId"])
     .index("by_provider_and_event_id", ["provider", "eventId"]),
+
+  // Circuit breaker health tracking for Piston API
+  pistonHealth: defineTable({
+    // Single document with id "singleton"
+    consecutiveFailures: v.number(),
+    circuitOpenUntil: v.optional(v.number()), // Timestamp when circuit closes
+    lastChecked: v.optional(v.number()),
+  }),
 });

@@ -1,6 +1,5 @@
 "use client";
 import { Snippet } from "@/types";
-import { useUser } from "@clerk/nextjs";
 import { useMutation } from "convex/react";
 import { api } from "../../../convex/_generated/api";
 import { useState } from "react";
@@ -13,7 +12,6 @@ import toast from "react-hot-toast";
 import StarButton from "@/components/StarButton";
 
 function SnippetCard({ snippet }: { snippet: Snippet }) {
-  const { user } = useUser();
   const deleteSnippet = useMutation(api.snippets.deleteSnippet);
   const [isDeleting, setIsDeleting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -58,7 +56,7 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
                   <div
                     className="absolute inset-0 bg-gradient-to-r from-blue-500 to-purple-500 rounded-lg blur opacity-20 
                   group-hover:opacity-30 transition-all duration-500"
-                    area-hidden="true"
+                    aria-hidden="true"
                   />
                   <div
                     className="relative p-2 rounded-lg bg-gradient-to-br from-blue-500/10 to-purple-500/10 group-hover:from-blue-500/20
@@ -89,7 +87,7 @@ function SnippetCard({ snippet }: { snippet: Snippet }) {
               >
                 <StarButton snippetId={snippet._id} />
 
-                {user?.id === snippet.userId && (
+                {snippet.isOwner && (
                   <div className="z-10" onClick={(e) => e.preventDefault()}>
                     <button
                       onClick={handleRequestDelete}

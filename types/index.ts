@@ -58,9 +58,10 @@ export interface CodeEditorState {
 export interface Snippet {
   _id: Id<"snippets">;
   _creationTime: number;
-  userId: string;
+  isOwner: boolean;
   language: string;
   code: string;
   title: string;
   userName: string;
+  starCount?: number;
 }

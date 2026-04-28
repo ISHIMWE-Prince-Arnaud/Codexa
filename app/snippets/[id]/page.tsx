@@ -1,19 +1,22 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "convex/react";
 import { useParams } from "next/navigation";
 import { api } from "../../../convex/_generated/api";
 import { Id } from "../../../convex/_generated/dataModel";
 import SnippetLoadingSkeleton from "./_components/SnippetLoadingSkeleton";
 import NavigationHeader from "@/components/NavigationHeader";
-import { Clock, Code, MessageSquare, User } from "lucide-react";
+import { Clock, Code, Edit, MessageSquare, User } from "lucide-react";
 import { Editor } from "@monaco-editor/react";
 import { defineMonacoThemes, LANGUAGE_CONFIG, SupportedLanguage } from "@/app/(root)/_constants";
 import Image from "next/image";
 import CopyButton from "./_components/CopyButton";
 import Comments from "./_components/Comments";
+import EditSnippetDialog from "./_components/EditSnippetDialog";
 
 function SnippetDetailPage() {
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const snippetId = useParams().id;
 
   // Validate ID format - Convex IDs are 24-character hex strings
@@ -54,7 +57,7 @@ function SnippetDetailPage() {
           <div className="max-w-[1200px] mx-auto">
             <div className="bg-[#121218] border border-[#ffffff0a] rounded-2xl p-6 sm:p-8">
               <h1 className="text-xl sm:text-2xl font-semibold text-white mb-4">Snippet Not Found</h1>
-              <p className="text-[#8b8b8d]">The snippet you&apos;re looking for doesn&apos;t exist or has been deleted.</p>
+              <p className="text-[#8b8b8d]">The snippet you're looking for doesn't exist or has been deleted.</p>
             </div>
           </div>
         </main>
@@ -101,8 +104,19 @@ function SnippetDetailPage() {
                   </div>
                 </div>
               </div>
-              <div className="inline-flex items-center px-3 py-1.5 bg-[#ffffff08] text-[#808086] rounded-lg text-sm font-medium">
-                {snippet.language}
+              <div className="flex items-center gap-2">
+                {snippet.isOwner && (
+                  <button
+                    onClick={() => setIsEditDialogOpen(true)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Edit
+                  </button>
+                )}
+                <div className="inline-flex items-center px-3 py-1.5 bg-[#ffffff08] text-[#808086] rounded-lg text-sm font-medium">
+                  {snippet.language}
+                </div>
               </div>
             </div>
           </div>
@@ -139,6 +153,17 @@ function SnippetDetailPage() {
           <Comments snippetId={snippet._id} />
         </div>
       </main>
+
+      {isEditDialogOpen && (
+        <EditSnippetDialog
+          snippetId={snippet._id}
+          currentTitle={snippet.title}
+          currentLanguage={snippet.language}
+          currentCode={snippet.code}
+          onClose={() => setIsEditDialogOpen(false)}
+          onSuccess={() => window.location.reload()}
+        />
+      )}
     </div>
   );
 }

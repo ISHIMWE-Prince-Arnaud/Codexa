@@ -24,11 +24,6 @@ function EditorPanel() {
     if (editor) editor.setValue(newCode);
   }, [language, editor]);
 
-  useEffect(() => {
-    const savedFontSize = localStorage.getItem("editor-font-size");
-    if (savedFontSize) setFontSize(parseInt(savedFontSize));
-  }, [setFontSize]);
-
   const handleRefresh = () => {
     const defaultCode = LANGUAGE_CONFIG[language as SupportedLanguage]?.defaultCode;
     if (editor) editor.setValue(defaultCode);
