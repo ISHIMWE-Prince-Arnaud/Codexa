@@ -97,8 +97,7 @@ http.route({
       }
 
       return new Response("Webhook processed successfully", { status: 200 });
-    } catch (error) {
-      console.log("Webhook error:", error);
+    } catch {
       return new Response("Error processing webhook", { status: 500 });
     }
   }),

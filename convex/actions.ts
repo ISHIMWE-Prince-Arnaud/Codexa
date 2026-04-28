@@ -105,7 +105,6 @@ export const executeCode = action({
         error: null,
       };
     } catch (error) {
-      console.error("Error executing code:", error);
       throw new ConvexError(
         error instanceof Error ? error.message : "Failed to execute code"
       );

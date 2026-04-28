@@ -3,10 +3,8 @@ import { v } from "convex/values";
 import { internalAction } from "./_generated/server";
 import { createHmac, timingSafeEqual } from "crypto";
 
-const webhookSecret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET!;
-
-function verifySignature(payload: string, signature: string): boolean {
-  const hmac = createHmac("sha256", webhookSecret);
+function verifySignature(payload: string, signature: string, secret: string): boolean {
+  const hmac = createHmac("sha256", secret);
   const computedSignature = hmac.update(payload).digest("hex");
   const sigBuf = Buffer.from(signature, "hex");
   const compBuf = Buffer.from(computedSignature, "hex");
@@ -20,7 +18,12 @@ export const verifyWebhook = internalAction({
     signature: v.string(),
   },
   handler: async (ctx, args) => {
-    const isValid = verifySignature(args.payload, args.signature);
+    const webhookSecret = process.env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+    if (!webhookSecret) {
+      throw new Error("Missing LEMON_SQUEEZY_WEBHOOK_SECRET environment variable");
+    }
+
+    const isValid = verifySignature(args.payload, args.signature, webhookSecret);
 
     if (!isValid) {
       throw new Error("Invalid signature");
