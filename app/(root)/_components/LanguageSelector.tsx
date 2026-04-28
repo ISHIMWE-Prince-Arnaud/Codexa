@@ -1,7 +1,7 @@
 "use client";
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { useEffect, useRef, useState } from "react";
-import { LANGUAGE_CONFIG } from "../_constants";
+import { LANGUAGE_CONFIG, SupportedLanguage } from "../_constants";
 import { motion, AnimatePresence } from "framer-motion";
 import Image from "next/image";
 import { ChevronDownIcon, Lock, Sparkles } from "lucide-react";
@@ -13,7 +13,7 @@ function LanguageSelector({ hasAccess }: { hasAccess: boolean }) {
 
   const { language, setLanguage } = useCodeEditorStore();
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const currentLanguageObj = LANGUAGE_CONFIG[language];
+  const currentLanguageObj = LANGUAGE_CONFIG[language as SupportedLanguage];
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

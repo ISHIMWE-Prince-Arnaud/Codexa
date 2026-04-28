@@ -8,7 +8,7 @@ import SnippetLoadingSkeleton from "./_components/SnippetLoadingSkeleton";
 import NavigationHeader from "@/components/NavigationHeader";
 import { Clock, Code, MessageSquare, User } from "lucide-react";
 import { Editor } from "@monaco-editor/react";
-import { defineMonacoThemes, LANGUAGE_CONFIG } from "@/app/(root)/_constants";
+import { defineMonacoThemes, LANGUAGE_CONFIG, SupportedLanguage } from "@/app/(root)/_constants";
 import Image from "next/image";
 import CopyButton from "./_components/CopyButton";
 import Comments from "./_components/Comments";
@@ -118,7 +118,7 @@ function SnippetDetailPage() {
             </div>
             <Editor
               height="600px"
-              language={LANGUAGE_CONFIG[snippet.language]?.monacoLanguage ?? "plaintext"}
+              language={LANGUAGE_CONFIG[snippet.language as SupportedLanguage]?.monacoLanguage ?? "plaintext"}
               value={snippet.code}
               theme="vs-dark"
               beforeMount={defineMonacoThemes}

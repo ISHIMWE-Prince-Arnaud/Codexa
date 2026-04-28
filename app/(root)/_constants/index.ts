@@ -1,8 +1,12 @@
 import { Theme } from "@/types";
 import { Monaco } from "@monaco-editor/react";
+import { PISTON_RUNTIMES, SupportedLanguage, SUPPORTED_LANGUAGES } from "../../../convex/constants";
+
+export { PISTON_RUNTIMES, SUPPORTED_LANGUAGES };
+export type { SupportedLanguage };
 
 type LanguageConfig = Record<
-  string,
+  SupportedLanguage,
   {
     id: string;
     label: string;
@@ -18,7 +22,7 @@ export const LANGUAGE_CONFIG: LanguageConfig = {
     id: "javascript",
     label: "JavaScript",
     logoPath: "/javascript.png",
-    pistonRuntime: { language: "javascript", version: "18.15.0" }, // api that we're gonna be using
+    pistonRuntime: PISTON_RUNTIMES.javascript,
     monacoLanguage: "javascript",
     defaultCode: `// JavaScript Playground
 const numbers = [1, 2, 3, 4, 5];
@@ -40,7 +44,7 @@ console.log('Sum of numbers:', sum);`,
     id: "typescript",
     label: "TypeScript",
     logoPath: "/typescript.png",
-    pistonRuntime: { language: "typescript", version: "5.0.3" },
+    pistonRuntime: PISTON_RUNTIMES.typescript,
     monacoLanguage: "typescript",
     defaultCode: `// TypeScript Playground
 interface NumberArray {
@@ -77,7 +81,7 @@ console.log('Sum of numbers:', math.sum());`,
     id: "python",
     label: "Python",
     logoPath: "/python.png",
-    pistonRuntime: { language: "python", version: "3.10.0" },
+    pistonRuntime: PISTON_RUNTIMES.python,
     monacoLanguage: "python",
     defaultCode: `# Python Playground
 numbers = [1, 2, 3, 4, 5]
@@ -99,7 +103,7 @@ print(f"Sum of numbers: {numbers_sum}")`,
     id: "java",
     label: "Java",
     logoPath: "/java.png",
-    pistonRuntime: { language: "java", version: "15.0.2" },
+    pistonRuntime: PISTON_RUNTIMES.java,
     monacoLanguage: "java",
     defaultCode: `public class Main {
   public static void main(String[] args) {
@@ -141,7 +145,7 @@ print(f"Sum of numbers: {numbers_sum}")`,
     id: "go",
     label: "Go",
     logoPath: "/go.png",
-    pistonRuntime: { language: "go", version: "1.16.2" },
+    pistonRuntime: PISTON_RUNTIMES.go,
     monacoLanguage: "go",
     defaultCode: `package main
 
@@ -182,7 +186,7 @@ func main() {
     id: "rust",
     label: "Rust",
     logoPath: "/rust.png",
-    pistonRuntime: { language: "rust", version: "1.68.2" },
+    pistonRuntime: PISTON_RUNTIMES.rust,
     monacoLanguage: "rust",
     defaultCode: `fn main() {
     // Create vector
@@ -215,7 +219,7 @@ func main() {
     id: "cpp",
     label: "C++",
     logoPath: "/cpp.png",
-    pistonRuntime: { language: "cpp", version: "10.2.0" },
+    pistonRuntime: PISTON_RUNTIMES.cpp,
     monacoLanguage: "cpp",
     defaultCode: `#include <iostream>
 #include <vector>
@@ -259,7 +263,7 @@ int main() {
     id: "csharp",
     label: "C#",
     logoPath: "/csharp.png",
-    pistonRuntime: { language: "csharp", version: "6.12.0" },
+    pistonRuntime: PISTON_RUNTIMES.csharp,
     monacoLanguage: "csharp",
     defaultCode: `using System;
 using System.Linq;
@@ -290,7 +294,7 @@ class Program {
     id: "ruby",
     label: "Ruby",
     logoPath: "/ruby.png",
-    pistonRuntime: { language: "ruby", version: "3.0.1" },
+    pistonRuntime: PISTON_RUNTIMES.ruby,
     monacoLanguage: "ruby",
     defaultCode: `# Create array
 numbers = [1, 2, 3, 4, 5]
@@ -314,7 +318,7 @@ puts "Sum of numbers: #{sum}"`,
     id: "swift",
     label: "Swift",
     logoPath: "/swift.png",
-    pistonRuntime: { language: "swift", version: "5.3.3" },
+    pistonRuntime: PISTON_RUNTIMES.swift,
     monacoLanguage: "swift",
     defaultCode: `// Create array
 let numbers = [1, 2, 3, 4, 5]

@@ -1,7 +1,7 @@
 "use client";
 import { useCodeEditorStore } from "@/store/useCodeEditorStore";
 import { useEffect, useState } from "react";
-import { defineMonacoThemes, LANGUAGE_CONFIG } from "../_constants";
+import { defineMonacoThemes, LANGUAGE_CONFIG, SupportedLanguage } from "../_constants";
 import { Editor } from "@monaco-editor/react";
 import { motion } from "framer-motion";
 import Image from "next/image";
@@ -20,7 +20,7 @@ function EditorPanel() {
 
   useEffect(() => {
     const savedCode = localStorage.getItem(`editor-code-${language}`);
-    const newCode = savedCode || LANGUAGE_CONFIG[language].defaultCode;
+    const newCode = savedCode || LANGUAGE_CONFIG[language as SupportedLanguage]?.defaultCode;
     if (editor) editor.setValue(newCode);
   }, [language, editor]);
 
@@ -30,7 +30,7 @@ function EditorPanel() {
   }, [setFontSize]);
 
   const handleRefresh = () => {
-    const defaultCode = LANGUAGE_CONFIG[language].defaultCode;
+    const defaultCode = LANGUAGE_CONFIG[language as SupportedLanguage]?.defaultCode;
     if (editor) editor.setValue(defaultCode);
     localStorage.removeItem(`editor-code-${language}`);
   };
@@ -55,7 +55,7 @@ function EditorPanel() {
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#1e1e2e] ring-1 ring-white/5">
               <Image
-                src={LANGUAGE_CONFIG[language] ? `/${language}.png` : "/javascript.png"}
+                src={LANGUAGE_CONFIG[language as SupportedLanguage] ? `/${language}.png` : "/javascript.png"}
                 alt="Logo"
                 width={24}
                 height={24}
@@ -128,7 +128,7 @@ function EditorPanel() {
           {clerk.loaded && (
             <Editor
               height="600px"
-              language={LANGUAGE_CONFIG[language].monacoLanguage}
+              language={LANGUAGE_CONFIG[language as SupportedLanguage]?.monacoLanguage ?? "javascript"}
               onChange={handleEditorChange}
               theme={theme}
               beforeMount={defineMonacoThemes}
