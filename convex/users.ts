@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, query } from "./_generated/server";
+import { internalMutation, internalQuery, query } from "./_generated/server";
 
 export const syncUser = internalMutation({
   args: {
@@ -87,5 +87,24 @@ export const upgradeToPro = internalMutation({
     });
 
     return { success: true };
+  },
+});
+
+/**
+ * Shared helper to check if a user has Pro status.
+ * Used by both actions and mutations for consistent Pro-gating.
+ */
+export const isProUser = internalQuery({
+  args: {
+    userId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user_id")
+      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .first();
+
+    return user?.isPro ?? false;
   },
 });

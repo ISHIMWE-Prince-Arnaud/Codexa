@@ -29,11 +29,11 @@ export const executeCode = action({
 
     // Check Pro status for non-JavaScript languages
     if (args.language !== "javascript") {
-      const user = await ctx.runQuery(api.users.getUser, {
+      const isPro = await ctx.runQuery(internal.users.isProUser, {
         userId: identity.subject,
       });
 
-      if (!user?.isPro) {
+      if (!isPro) {
         throw new ConvexError("Pro subscription required to use this language");
       }
     }
