@@ -52,7 +52,7 @@ export interface CodeEditorState {
   setLanguage: (language: string) => void;
   setTheme: (theme: string) => void;
   setFontSize: (fontSize: number) => void;
-  runCode: () => Promise<void>;
+  runCode: (executeFn?: (args: { language: string; code: string }) => Promise<{ success: boolean; output: string; error: string | null }>) => Promise<void>;
 }
 
 export interface Snippet {

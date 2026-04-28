@@ -55,11 +55,13 @@ export const getUserStats = query({
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new ConvexError("Not authenticated");
 
+    // Limit to most recent 1000 executions to avoid loading all records into memory
     const executions = await ctx.db
       .query("codeExecutions")
       .withIndex("by_user_id")
       .filter((q) => q.eq(q.field("userId"), identity.subject))
-      .collect();
+      .order("desc")
+      .take(1000);
 
     // Get starred snippets
     const starredSnippets = await ctx.db

@@ -1,5 +1,6 @@
 import { v } from "convex/values";
 import { mutation, query } from "./_generated/server";
+import type { Doc } from "./_generated/dataModel";
 import sanitizeHtml from "sanitize-html";
 
 export const createSnippet = mutation({
@@ -11,6 +12,10 @@ export const createSnippet = mutation({
   handler: async (ctx, args) => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) throw new Error("Not authenticated");
+
+    // Validate input lengths
+    if (args.title.length > 200) throw new Error("Title must be less than 200 characters");
+    if (args.code.length > 50000) throw new Error("Code must be less than 50KB");
 
     const user = await ctx.db
       .query("users")
@@ -48,27 +53,35 @@ export const deleteSnippet = mutation({
       throw new Error("Not authorized to delete this snippet");
     }
 
-    const comments = await ctx.db
-      .query("snippetComments")
-      .withIndex("by_snippet_id")
-      .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-      .collect();
+    // Limit deletions to prevent exceeding mutation limits
+    const MAX_DELETIONS = 100;
 
-    for (const comment of comments) {
-      await ctx.db.delete(comment._id);
+    try {
+      const comments = await ctx.db
+        .query("snippetComments")
+        .withIndex("by_snippet_id")
+        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+        .take(MAX_DELETIONS);
+
+      for (const comment of comments) {
+        await ctx.db.delete(comment._id);
+      }
+
+      const stars = await ctx.db
+        .query("stars")
+        .withIndex("by_snippet_id")
+        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+        .take(MAX_DELETIONS);
+
+      for (const star of stars) {
+        await ctx.db.delete(star._id);
+      }
+
+      // Delete the snippet last - if this fails, the mutation is atomic and all changes are rolled back
+      await ctx.db.delete(args.snippetId);
+    } catch (error) {
+      throw new Error(`Failed to delete snippet: ${error instanceof Error ? error.message : String(error)}`);
     }
-
-    const stars = await ctx.db
-      .query("stars")
-      .withIndex("by_snippet_id")
-      .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-      .collect();
-
-    for (const star of stars) {
-      await ctx.db.delete(star._id);
-    }
-
-    await ctx.db.delete(args.snippetId);
   },
 });
 
@@ -129,6 +142,9 @@ export const addComment = mutation({
       .first();
 
     if (!user) throw new Error("User not found");
+
+    // Validate content length
+    if (args.content.length > 5000) throw new Error("Comment must be less than 5000 characters");
 
     // Sanitize content to prevent XSS - strip all HTML tags
     const sanitizedContent = sanitizeHtml(args.content, {
@@ -244,6 +260,6 @@ export const getStarredSnippets = query({
 
     const snippets = await Promise.all(stars.map((star) => ctx.db.get(star.snippetId)));
 
-    return snippets.filter((snippet) => snippet !== null);
+    return snippets.filter((s): s is Doc<"snippets"> => s !== null);
   },
 });

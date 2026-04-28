@@ -19,10 +19,33 @@ function OutputPanel() {
 
   const handleCopy = async () => {
     if (!hasContent) return;
-    await navigator.clipboard.writeText(error || output);
-    setIsCopied(true);
+    const textToCopy = error || output;
 
-    setTimeout(() => setIsCopied(false), 2000);
+    try {
+      // Try modern clipboard API first
+      await navigator.clipboard.writeText(textToCopy);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch {
+      // Fallback for older browsers or non-secure contexts
+      try {
+        const textArea = document.createElement("textarea");
+        textArea.value = textToCopy;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        const successful = document.execCommand("copy");
+        document.body.removeChild(textArea);
+
+        if (successful) {
+          setIsCopied(true);
+          setTimeout(() => setIsCopied(false), 2000);
+        }
+      } catch {
+        // Silent fail for clipboard issues
+      }
+    }
   };
 
   return (

@@ -36,7 +36,7 @@ function EditorPanel() {
   };
 
   const handleEditorChange = (value: string | undefined) => {
-    if (value) localStorage.setItem(`editor-code-${language}`, value);
+    if (value !== undefined) localStorage.setItem(`editor-code-${language}`, value);
   };
 
   const handleFontSizeChange = (newSize: number) => {
@@ -54,7 +54,12 @@ function EditorPanel() {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
             <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#1e1e2e] ring-1 ring-white/5">
-              <Image src={"/" + language + ".png"} alt="Logo" width={24} height={24} />
+              <Image
+                src={LANGUAGE_CONFIG[language] ? `/${language}.png` : "/javascript.png"}
+                alt="Logo"
+                width={24}
+                height={24}
+              />
             </div>
             <div>
               <h2 className="text-sm font-medium text-white">Code Editor</h2>

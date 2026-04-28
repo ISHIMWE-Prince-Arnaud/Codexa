@@ -5,10 +5,8 @@ const useMounted = () => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setMounted(true);
-    }, 0);
-    return () => clearTimeout(timer);
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   return mounted;

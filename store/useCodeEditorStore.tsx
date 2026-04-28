@@ -1,5 +1,4 @@
 import { CodeEditorState } from "./../types/index";
-import { LANGUAGE_CONFIG } from "@/app/(root)/_constants";
 import { create } from "zustand";
 import { Monaco } from "@monaco-editor/react";
 
@@ -13,16 +12,24 @@ const getInitialState = () => {
     };
   }
 
-  // if we're on the client, return values from local storage bc localStorage is a browser API.
-  const savedLanguage = localStorage.getItem("editor-language") || "javascript";
-  const savedTheme = localStorage.getItem("editor-theme") || "vs-dark";
-  const savedFontSize = localStorage.getItem("editor-font-size") || 16;
+  try {
+    // if we're on the client, return values from local storage bc localStorage is a browser API.
+    const savedLanguage = localStorage.getItem("editor-language") || "javascript";
+    const savedTheme = localStorage.getItem("editor-theme") || "vs-dark";
+    const savedFontSize = localStorage.getItem("editor-font-size") || 16;
 
-  return {
-    language: savedLanguage,
-    theme: savedTheme,
-    fontSize: Number(savedFontSize),
-  };
+    return {
+      language: savedLanguage,
+      theme: savedTheme,
+      fontSize: Number(savedFontSize),
+    };
+  } catch {
+    return {
+      language: "javascript",
+      fontSize: 16,
+      theme: "vs-dark",
+    };
+  }
 };
 
 export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
@@ -71,7 +78,7 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
       });
     },
 
-    runCode: async () => {
+    runCode: async (executeFn?: (args: { language: string; code: string }) => Promise<{ success: boolean; output: string; error: string | null }>) => {
       const { language, getCode } = get();
       const code = getCode();
 
@@ -83,76 +90,34 @@ export const useCodeEditorStore = create<CodeEditorState>((set, get) => {
       set({ isRunning: true, error: null, output: "" });
 
       try {
-        const runtime = LANGUAGE_CONFIG[language].pistonRuntime;
-        const response = await fetch("https://emkc.org/api/v2/piston/execute", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            language: runtime.language,
-            version: runtime.version,
-            files: [{ content: code }],
-          }),
-        });
+        if (!executeFn) {
+          throw new Error("Execution function not provided");
+        }
 
-        const data = await response.json();
+        const result = await executeFn({ language, code });
 
-        console.log("data back from piston:", data);
-
-        // handle API-level erros
-        if (data.message) {
+        if (!result.success) {
           set({
-            error: data.message,
-            executionResult: { code, output: "", error: data.message },
+            error: result.error,
+            executionResult: { code, output: "", error: result.error },
           });
           return;
         }
-
-        // handle compilation errors
-        if (data.compile && data.compile.code !== 0) {
-          const error = data.compile.stderr || data.compile.output;
-          set({
-            error,
-            executionResult: {
-              code,
-              output: "",
-              error,
-            },
-          });
-          return;
-        }
-
-        if (data.run && data.run.code !== 0) {
-          const error = data.run.stderr || data.run.output;
-          set({
-            error,
-            executionResult: {
-              code,
-              output: "",
-              error,
-            },
-          });
-          return;
-        }
-
-        // if we get here, execution was successful
-        const output = data.run.output;
 
         set({
-          output: output.trim(),
+          output: result.output,
           error: null,
           executionResult: {
             code,
-            output: output.trim(),
+            output: result.output,
             error: null,
           },
         });
       } catch (error) {
-        console.log("Error running code:", error);
+        const errorMessage = error instanceof Error ? error.message : "Error running code";
         set({
-          error: "Error running code",
-          executionResult: { code, output: "", error: "Error running code" },
+          error: errorMessage,
+          executionResult: { code, output: "", error: errorMessage },
         });
       } finally {
         set({ isRunning: false });

@@ -9,8 +9,10 @@ import LanguageSelector from "./LanguageSelector";
 import RunButton from "./RunButton";
 import HeaderProfileBtn from "./HeaderProfileBtn";
 
+// Singleton Convex client to avoid creating new connections on every render
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
+
 async function Header() {
-  const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!);
   const user = await currentUser();
 
   const convexUser = await convex.query(api.users.getUser, {

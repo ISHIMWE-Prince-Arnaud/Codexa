@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as actions from "../actions.js";
 import type * as codeExecutions from "../codeExecutions.js";
 import type * as http from "../http.js";
 import type * as lemonSqueezy from "../lemonSqueezy.js";
@@ -21,6 +22,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  actions: typeof actions;
   codeExecutions: typeof codeExecutions;
   http: typeof http;
   lemonSqueezy: typeof lemonSqueezy;

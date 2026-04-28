@@ -16,10 +16,51 @@ import Comments from "./_components/Comments";
 function SnippetDetailPage() {
   const snippetId = useParams().id;
 
-  const snippet = useQuery(api.snippets.getSnippetById, { snippetId: snippetId as Id<"snippets"> });
-  const comments = useQuery(api.snippets.getComments, { snippetId: snippetId as Id<"snippets"> });
+  // Validate ID format - Convex IDs are 24-character hex strings
+  const isValidId = typeof snippetId === "string" && /^[a-f0-9]{24}$/.test(snippetId);
+
+  const snippet = useQuery(
+    api.snippets.getSnippetById,
+    isValidId ? { snippetId: snippetId as Id<"snippets"> } : "skip"
+  );
+  const comments = useQuery(
+    api.snippets.getComments,
+    isValidId ? { snippetId: snippetId as Id<"snippets"> } : "skip"
+  );
+
+  if (!isValidId) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f]">
+        <NavigationHeader />
+        <main className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
+          <div className="max-w-[1200px] mx-auto">
+            <div className="bg-[#121218] border border-[#ffffff0a] rounded-2xl p-6 sm:p-8">
+              <h1 className="text-xl sm:text-2xl font-semibold text-white mb-4">Invalid Snippet ID</h1>
+              <p className="text-[#8b8b8d]">The snippet ID in the URL is not valid.</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   if (snippet === undefined) return <SnippetLoadingSkeleton />;
+
+  if (snippet === null) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0f]">
+        <NavigationHeader />
+        <main className="max-w-[90rem] mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-12">
+          <div className="max-w-[1200px] mx-auto">
+            <div className="bg-[#121218] border border-[#ffffff0a] rounded-2xl p-6 sm:p-8">
+              <h1 className="text-xl sm:text-2xl font-semibold text-white mb-4">Snippet Not Found</h1>
+              <p className="text-[#8b8b8d]">The snippet you&apos;re looking for doesn&apos;t exist or has been deleted.</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
@@ -77,7 +118,7 @@ function SnippetDetailPage() {
             </div>
             <Editor
               height="600px"
-              language={LANGUAGE_CONFIG[snippet.language].monacoLanguage}
+              language={LANGUAGE_CONFIG[snippet.language]?.monacoLanguage ?? "plaintext"}
               value={snippet.code}
               theme="vs-dark"
               beforeMount={defineMonacoThemes}

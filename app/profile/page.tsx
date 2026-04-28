@@ -2,7 +2,7 @@
 import { useUser } from "@clerk/nextjs";
 import { usePaginatedQuery, useQuery } from "convex/react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../convex/_generated/api";
 import NavigationHeader from "@/components/NavigationHeader";
 import ProfileHeader from "./_components/ProfileHeader";
@@ -32,9 +32,7 @@ function ProfilePage() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<"executions" | "starred">("executions");
 
-  const userStats = useQuery(api.codeExecutions.getUserStats, {
-    userId: user?.id ?? "",
-  });
+  const userStats = useQuery(api.codeExecutions.getUserStats);
 
   const starredSnippets = useQuery(api.snippets.getStarredSnippets);
 
@@ -57,7 +55,11 @@ function ProfilePage() {
     if (executionStatus === "CanLoadMore") loadMore(5);
   };
 
-  if (!user && isLoaded) return router.push("/");
+  useEffect(() => {
+    if (!user && isLoaded) router.push("/");
+  }, [user, isLoaded, router]);
+
+  if (!user && isLoaded) return null;
 
   return (
     <div className="min-h-screen bg-[#0a0a0f]">
