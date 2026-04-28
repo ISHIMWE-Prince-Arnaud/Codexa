@@ -3,11 +3,17 @@ import { mutation, query } from "./_generated/server";
 import type { Doc } from "./_generated/dataModel";
 import sanitizeHtml from "sanitize-html";
 import { checkRateLimit } from "./rateLimit";
+import { SUPPORTED_LANGUAGES } from "./constants";
+
+// Build a union validator for supported languages
+const languageValidator = v.union(
+  ...SUPPORTED_LANGUAGES.map((lang) => v.literal(lang))
+);
 
 export const createSnippet = mutation({
   args: {
     title: v.string(),
-    language: v.string(),
+    language: languageValidator,
     code: v.string(),
   },
   handler: async (ctx, args) => {
@@ -57,28 +63,38 @@ export const deleteSnippet = mutation({
       throw new Error("Not authorized to delete this snippet");
     }
 
-    // Limit deletions to prevent exceeding mutation limits
-    const MAX_DELETIONS = 100;
-
     try {
-      const comments = await ctx.db
-        .query("snippetComments")
-        .withIndex("by_snippet_id")
-        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-        .take(MAX_DELETIONS);
+      // Delete all comments in batches to prevent orphaning
+      const BATCH_SIZE = 100;
+      let hasMoreComments = true;
+      while (hasMoreComments) {
+        const comments = await ctx.db
+          .query("snippetComments")
+          .withIndex("by_snippet_id")
+          .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+          .take(BATCH_SIZE);
 
-      for (const comment of comments) {
-        await ctx.db.delete(comment._id);
+        for (const comment of comments) {
+          await ctx.db.delete(comment._id);
+        }
+
+        hasMoreComments = comments.length === BATCH_SIZE;
       }
 
-      const stars = await ctx.db
-        .query("stars")
-        .withIndex("by_snippet_id")
-        .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
-        .take(MAX_DELETIONS);
+      // Delete all stars in batches to prevent orphaning
+      let hasMoreStars = true;
+      while (hasMoreStars) {
+        const stars = await ctx.db
+          .query("stars")
+          .withIndex("by_snippet_id")
+          .filter((q) => q.eq(q.field("snippetId"), args.snippetId))
+          .take(BATCH_SIZE);
 
-      for (const star of stars) {
-        await ctx.db.delete(star._id);
+        for (const star of stars) {
+          await ctx.db.delete(star._id);
+        }
+
+        hasMoreStars = stars.length === BATCH_SIZE;
       }
 
       // Delete the snippet last - if this fails, the mutation is atomic and all changes are rolled back

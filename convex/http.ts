@@ -2,7 +2,7 @@ import { httpRouter } from "convex/server";
 import { httpAction } from "./_generated/server";
 import { Webhook } from "svix";
 import { WebhookEvent } from "@clerk/nextjs/server";
-import { api, internal } from "./_generated/api";
+import { internal } from "./_generated/api";
 
 const http = httpRouter();
 
@@ -41,10 +41,24 @@ http.route({
       return new Response("Error occurred", { status: 400 });
     }
 
+    // Check for duplicate events (idempotency)
+    const clerkEventId = (evt.data as { id?: string }).id ?? svix_id ?? evt.type;
+    const eventId = `clerk:${clerkEventId}`;
+
+    const alreadyProcessed = await ctx.runQuery(internal.webhookHelpers.checkWebhookEvent, {
+      eventId,
+      provider: "clerk",
+    });
+
+    if (alreadyProcessed) {
+      return new Response("Already processed", { status: 200 });
+    }
+
     const eventType = evt.type;
-    if (eventType === "user.created") {
-      // save the user to convex db
-      const { id, email_addresses, first_name, last_name } = evt.data;
+    if (eventType === "user.created" || eventType === "user.updated") {
+      // save the user to convex db (or update if existing)
+      const data = evt.data as { id: string; email_addresses: { email_address: string }[]; first_name?: string; last_name?: string };
+      const { id, email_addresses, first_name, last_name } = data;
 
       const email = email_addresses[0].email_address;
       const name = `${first_name || ""} ${last_name || ""}`.trim();
@@ -56,9 +70,16 @@ http.route({
           name,
         });
       } catch {
-        return new Response("Error creating user", { status: 500 });
+        return new Response("Error syncing user", { status: 500 });
       }
     }
+
+    // Record that we've processed this event
+    await ctx.runMutation(internal.webhookHelpers.recordWebhookEvent, {
+      eventId,
+      provider: "clerk",
+      eventType,
+    });
 
     return new Response("Webhook processed successfully", { status: 200 });
   }),
@@ -81,10 +102,24 @@ http.route({
         signature,
       });
 
-      if (payload.meta.event_name === "order_created") {
-        const { data } = payload;
+      // Check for duplicate events (idempotency)
+      const payloadData = payload as { meta: { event_id?: string; event_name: string }; data: { id: string; attributes: { user_email: string; customer_id: number; total: number } } };
+      const lemonEventId = payloadData.meta.event_id ?? payloadData.data.id ?? signature.slice(0, 16);
+      const eventId = `lemon-squeezy:${lemonEventId}`;
 
-        const { success } = await ctx.runMutation(api.users.upgradeToPro, {
+      const alreadyProcessed = await ctx.runQuery(internal.webhookHelpers.checkWebhookEvent, {
+        eventId,
+        provider: "lemon-squeezy",
+      });
+
+      if (alreadyProcessed) {
+        return new Response("Already processed", { status: 200 });
+      }
+
+      if (payloadData.meta.event_name === "order_created") {
+        const { data } = payloadData;
+
+        const { success } = await ctx.runMutation(internal.users.upgradeToPro, {
           email: data.attributes.user_email,
           lemonSqueezyCustomerId: data.attributes.customer_id.toString(),
           lemonSqueezyOrderId: data.id,
@@ -95,6 +130,13 @@ http.route({
           // optionally do anything here
         }
       }
+
+      // Record that we've processed this event
+      await ctx.runMutation(internal.webhookHelpers.recordWebhookEvent, {
+        eventId,
+        provider: "lemon-squeezy",
+        eventType: payloadData.meta.event_name,
+      });
 
       return new Response("Webhook processed successfully", { status: 200 });
     } catch {

@@ -1,20 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { action } from "./_generated/server";
-import { api } from "./_generated/api";
-
-// Piston runtime configuration for each language
-const PISTON_RUNTIMES: Record<string, { language: string; version: string }> = {
-  javascript: { language: "javascript", version: "18.15.0" },
-  typescript: { language: "typescript", version: "5.0.3" },
-  python: { language: "python", version: "3.10.0" },
-  java: { language: "java", version: "15.0.2" },
-  go: { language: "go", version: "1.16.2" },
-  rust: { language: "rust", version: "1.68.2" },
-  cpp: { language: "cpp", version: "10.2.0" },
-  csharp: { language: "csharp", version: "6.12.0" },
-  ruby: { language: "ruby", version: "3.0.1" },
-  swift: { language: "swift", version: "5.3.3" },
-};
+import { api, internal } from "./_generated/api";
+import { PISTON_RUNTIMES, SupportedLanguage } from "./constants";
 
 export const executeCode = action({
   args: {
@@ -23,18 +10,25 @@ export const executeCode = action({
   },
   handler: async (ctx, args) => {
     // Validate language
-    const runtime = PISTON_RUNTIMES[args.language];
+    const runtime = PISTON_RUNTIMES[args.language as SupportedLanguage];
     if (!runtime) {
       throw new ConvexError("Unsupported language");
     }
 
+    // Require authentication for all languages (for rate limiting and abuse prevention)
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new ConvexError("Authentication required to execute code");
+    }
+
+    // Check rate limit before allowing execution
+    await ctx.runMutation(internal.rateLimit.checkRateLimitInternal, {
+      userId: identity.subject,
+      action: "executeCode",
+    });
+
     // Check Pro status for non-JavaScript languages
     if (args.language !== "javascript") {
-      const identity = await ctx.auth.getUserIdentity();
-      if (!identity) {
-        throw new ConvexError("Authentication required for non-JavaScript languages");
-      }
-
       const user = await ctx.runQuery(api.users.getUser, {
         userId: identity.subject,
       });

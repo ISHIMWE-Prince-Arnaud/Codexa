@@ -1,5 +1,5 @@
 import { v } from "convex/values";
-import { internalMutation, mutation, query } from "./_generated/server";
+import { internalMutation, query } from "./_generated/server";
 
 export const syncUser = internalMutation({
   args: {
@@ -10,6 +10,7 @@ export const syncUser = internalMutation({
   handler: async (ctx, args) => {
     const existingUser = await ctx.db
       .query("users")
+      .withIndex("by_user_id")
       .filter((q) => q.eq(q.field("userId"), args.userId))
       .first();
 
@@ -20,6 +21,14 @@ export const syncUser = internalMutation({
         name: args.name,
         isPro: false,
       });
+    } else {
+      // Update existing user if name or email changed
+      if (existingUser.name !== args.name || existingUser.email !== args.email) {
+        await ctx.db.patch(existingUser._id, {
+          name: args.name,
+          email: args.email,
+        });
+      }
     }
   },
 });
@@ -48,7 +57,7 @@ export const getUser = query({
   },
 });
 
-export const upgradeToPro = mutation({
+export const upgradeToPro = internalMutation({
   args: {
     email: v.string(),
     lemonSqueezyCustomerId: v.string(),

@@ -48,7 +48,15 @@ export default defineSchema({
   rateLimits: defineTable({
     userId: v.string(),
     action: v.string(), // e.g. "createSnippet", "addComment", etc.
-    count: v.number(),
-    windowStart: v.number(), // timestamp when the current window started
-  }).index("by_user_id_and_action", ["userId", "action"]),
+    timestamp: v.number(), // when this request was made (for window-based counting)
+  }).index("by_user_id_and_action", ["userId", "action"])
+    .index("by_user_id_and_action_timestamp", ["userId", "action", "timestamp"]),
+
+  webhookEvents: defineTable({
+    eventId: v.string(), // unique event ID from the webhook provider
+    provider: v.string(), // "clerk" or "lemon-squeezy"
+    eventType: v.string(),
+    processedAt: v.number(),
+  }).index("by_event_id", ["eventId"])
+    .index("by_provider_and_event_id", ["provider", "eventId"]),
 });
