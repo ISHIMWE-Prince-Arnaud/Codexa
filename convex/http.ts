@@ -37,8 +37,7 @@ http.route({
         "svix-timestamp": svix_timestamp,
         "svix-signature": svix_signature,
       }) as WebhookEvent;
-    } catch (err) {
-      console.error("Error verifying webhook:", err);
+    } catch {
       return new Response("Error occurred", { status: 400 });
     }
 
@@ -56,8 +55,7 @@ http.route({
           email,
           name,
         });
-      } catch (error) {
-        console.log("Error creating user:", error);
+      } catch {
         return new Response("Error creating user", { status: 500 });
       }
     }

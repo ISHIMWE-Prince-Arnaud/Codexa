@@ -53,7 +53,7 @@ function NavigationHeader() {
             </Link>
           </div>
 
-          {/* right rection */}
+          {/* right section */}
           <div className="flex items-center gap-4">
             <SignedOut>
               <Link
