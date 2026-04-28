@@ -14,7 +14,7 @@ import CommentForm from "./CommentForm";
 function Comments({ snippetId }: { snippetId: Id<"snippets"> }) {
   const { user } = useUser();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deletinCommentId, setDeletingCommentId] = useState<Id<"snippetComments"> | null>(null);
+  const [deletingCommentId, setDeletingCommentId] = useState<Id<"snippetComments"> | null>(null);
   const [commentToDeleteId, setCommentToDeleteId] = useState<Id<"snippetComments"> | null>(null);
 
   const comments = useQuery(api.snippets.getComments, { snippetId }) || [];
@@ -81,7 +81,7 @@ function Comments({ snippetId }: { snippetId: Id<"snippets"> }) {
               key={comment._id}
               comment={comment}
               onDelete={(commentId) => setCommentToDeleteId(commentId)}
-              isDeleting={deletinCommentId === comment._id}
+              isDeleting={deletingCommentId === comment._id}
               currentUserId={user?.id}
             />
           ))}
@@ -99,7 +99,7 @@ function Comments({ snippetId }: { snippetId: Id<"snippets"> }) {
             exit={{ opacity: 0 }}
             transition={{ duration: 0.15 }}
             onClick={() => {
-              if (!deletinCommentId) setCommentToDeleteId(null);
+              if (!deletingCommentId) setCommentToDeleteId(null);
             }}
           >
             <motion.div
@@ -132,7 +132,7 @@ function Comments({ snippetId }: { snippetId: Id<"snippets"> }) {
                 <button
                   type="button"
                   onClick={() => setCommentToDeleteId(null)}
-                  disabled={!!deletinCommentId}
+                  disabled={!!deletingCommentId}
                   className="px-4 py-2 rounded-lg bg-gray-800/60 hover:bg-gray-800 text-gray-200 transition-colors disabled:opacity-50"
                 >
                   Cancel
@@ -141,10 +141,10 @@ function Comments({ snippetId }: { snippetId: Id<"snippets"> }) {
                 <button
                   type="button"
                   onClick={() => handleDeleteComment(commentToDelete._id)}
-                  disabled={!!deletinCommentId}
+                  disabled={!!deletingCommentId}
                   className="px-4 py-2 rounded-lg bg-red-500/15 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-50"
                 >
-                  {deletinCommentId ? "Deleting..." : "Delete"}
+                  {deletingCommentId ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </motion.div>
