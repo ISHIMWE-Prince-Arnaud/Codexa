@@ -57,6 +57,22 @@ export const getUser = query({
   },
 });
 
+export const getUserInternal = query({
+  args: { userId: v.string() },
+
+  handler: async (ctx, args) => {
+    const user = await ctx.db
+      .query("users")
+      .withIndex("by_user_id")
+      .filter((q) => q.eq(q.field("userId"), args.userId))
+      .first();
+
+    if (!user) return null;
+
+    return user;
+  },
+});
+
 export const upgradeToPro = internalMutation({
   args: {
     email: v.string(),

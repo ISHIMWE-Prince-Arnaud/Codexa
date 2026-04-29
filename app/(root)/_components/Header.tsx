@@ -16,7 +16,7 @@ async function Header() {
   const user = await currentUser();
 
   const convexUser = user?.id
-    ? await convex.query(api.users.getUser, { userId: user.id })
+    ? await convex.query(api.users.getUserInternal, { userId: user.id })
     : null;
 
   return (

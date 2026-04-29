@@ -17,7 +17,7 @@ async function PricingPage() {
 
   const user = await currentUser();
   const convexUser = user
-    ? await convex.query(api.users.getUser, {
+    ? await convex.query(api.users.getUserInternal, {
         userId: user.id,
       })
     : null;
