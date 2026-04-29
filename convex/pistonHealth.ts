@@ -1,27 +1,41 @@
-import { ConvexError, v } from "convex/values";
+import { v } from "convex/values";
 import { internalMutation, internalQuery } from "./_generated/server";
+import { Id } from "./_generated/dataModel";
 
-const PISTON_HEALTH_DOC_ID = "singleton" as const;
 const CIRCUIT_OPEN_DURATION_MS = 60 * 1000; // 60 seconds
 const MAX_CONSECUTIVE_FAILURES = 5;
+
+// Singleton document ID - will be set after first initialization
+let cachedHealthId: Id<"pistonHealth"> | null = null;
 
 /**
  * Get or initialize the Piston health document.
  */
 async function getOrInitHealth(ctx: {
   db: {
-    get: (id: string) => Promise<{ consecutiveFailures: number; circuitOpenUntil?: number; lastChecked?: number } | null>;
-    insert: (table: "pistonHealth", data: { _id: string; consecutiveFailures: number }) => Promise<void>;
+    get: (id: Id<"pistonHealth">) => Promise<{ _id: Id<"pistonHealth">; consecutiveFailures: number; circuitOpenUntil?: number; lastChecked?: number } | null>;
+    query: (table: "pistonHealth") => { first: () => Promise<{ _id: Id<"pistonHealth">; consecutiveFailures: number; circuitOpenUntil?: number; lastChecked?: number } | null> };
+    insert: (table: "pistonHealth", data: { consecutiveFailures: number }) => Promise<Id<"pistonHealth">>;
   };
 }) {
-  let health = await ctx.db.get(PISTON_HEALTH_DOC_ID);
+  // Try to use cached ID first
+  if (cachedHealthId) {
+    const health = await ctx.db.get(cachedHealthId);
+    if (health) return health;
+  }
+
+  // Query for first document
+  let health = await ctx.db.query("pistonHealth").first();
 
   if (!health) {
-    await ctx.db.insert("pistonHealth", {
-      _id: PISTON_HEALTH_DOC_ID,
+    // Create initial document
+    const id = await ctx.db.insert("pistonHealth", {
       consecutiveFailures: 0,
     });
-    health = { consecutiveFailures: 0 };
+    health = { _id: id, consecutiveFailures: 0 };
+    cachedHealthId = id;
+  } else {
+    cachedHealthId = health._id;
   }
 
   return health;
@@ -33,7 +47,7 @@ async function getOrInitHealth(ctx: {
 export const isPistonAvailable = internalQuery({
   args: {},
   handler: async (ctx) => {
-    const health = await ctx.db.get(PISTON_HEALTH_DOC_ID);
+    const health = await ctx.db.query("pistonHealth").first();
 
     if (!health) return true; // No health record means no failures yet
 
@@ -60,7 +74,7 @@ export const recordPistonResult = internalMutation({
     if (args.success) {
       // Reset failures on success
       if (health.consecutiveFailures > 0 || health.circuitOpenUntil) {
-        await ctx.db.patch(PISTON_HEALTH_DOC_ID, {
+        await ctx.db.patch(health._id, {
           consecutiveFailures: 0,
           circuitOpenUntil: undefined,
           lastChecked: Date.now(),
@@ -74,7 +88,7 @@ export const recordPistonResult = internalMutation({
 
     // Open circuit if threshold reached
     if (newFailures >= MAX_CONSECUTIVE_FAILURES) {
-      await ctx.db.patch(PISTON_HEALTH_DOC_ID, {
+      await ctx.db.patch(health._id, {
         consecutiveFailures: newFailures,
         circuitOpenUntil: Date.now() + CIRCUIT_OPEN_DURATION_MS,
         lastChecked: Date.now(),
@@ -83,7 +97,7 @@ export const recordPistonResult = internalMutation({
     }
 
     // Just increment failures
-    await ctx.db.patch(PISTON_HEALTH_DOC_ID, {
+    await ctx.db.patch(health._id, {
       consecutiveFailures: newFailures,
       lastChecked: Date.now(),
     });
@@ -98,7 +112,7 @@ export const recordPistonResult = internalMutation({
 export const healthCheckPiston = internalMutation({
   args: {},
   handler: async (ctx) => {
-    const health = await ctx.db.get(PISTON_HEALTH_DOC_ID);
+    const health = await ctx.db.query("pistonHealth").first();
 
     // Only check if circuit is currently open
     if (health?.circuitOpenUntil && health.circuitOpenUntil > Date.now()) {
@@ -112,7 +126,7 @@ export const healthCheckPiston = internalMutation({
       if (response.ok) {
         // Reset failures if successful
         if (health && (health.consecutiveFailures > 0 || health.circuitOpenUntil)) {
-          await ctx.db.patch(PISTON_HEALTH_DOC_ID, {
+          await ctx.db.patch(health._id, {
             consecutiveFailures: 0,
             circuitOpenUntil: undefined,
             lastChecked: Date.now(),

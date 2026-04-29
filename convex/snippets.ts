@@ -1,6 +1,5 @@
 import { ConvexError, v } from "convex/values";
 import { internalMutation, mutation, query } from "./_generated/server";
-import type { Doc } from "./_generated/dataModel";
 import sanitizeHtml from "sanitize-html";
 import { checkRateLimit } from "./rateLimit";
 import { SUPPORTED_LANGUAGES } from "./constants";
@@ -393,20 +392,23 @@ export const reconcileStarCounts = internalMutation({
   args: {},
   handler: async (ctx) => {
     const BATCH_SIZE = 100;
-    let cursor: string | undefined;
     let reconciled = 0;
     let checked = 0;
+    let hasMore = true;
 
-    // Paginate through all snippets
-    while (true) {
-      const page = await ctx.db
+    // Process in batches using take() instead of paginate()
+    // to avoid Convex's "single paginated query per function" limit
+    while (hasMore) {
+      // Get batch of snippets
+      const snippets = await ctx.db
         .query("snippets")
-        .paginate({
-          cursor,
-          numItems: BATCH_SIZE,
-        });
+        .take(BATCH_SIZE);
 
-      for (const snippet of page.page) {
+      if (snippets.length === 0) {
+        break;
+      }
+
+      for (const snippet of snippets) {
         checked++;
 
         // Count actual stars for this snippet
@@ -426,10 +428,8 @@ export const reconcileStarCounts = internalMutation({
         }
       }
 
-      if (!page.continueCursor || !page.isDone) {
-        break;
-      }
-      cursor = page.continueCursor;
+      // Continue if we got a full batch (there might be more)
+      hasMore = snippets.length === BATCH_SIZE;
     }
 
     return { checked, reconciled };

@@ -9,10 +9,12 @@
  */
 
 import type * as actions from "../actions.js";
+import type * as admin from "../admin.js";
 import type * as codeExecutions from "../codeExecutions.js";
 import type * as constants from "../constants.js";
 import type * as http from "../http.js";
 import type * as lemonSqueezy from "../lemonSqueezy.js";
+import type * as pistonHealth from "../pistonHealth.js";
 import type * as rateLimit from "../rateLimit.js";
 import type * as snippets from "../snippets.js";
 import type * as users from "../users.js";
@@ -26,10 +28,12 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   actions: typeof actions;
+  admin: typeof admin;
   codeExecutions: typeof codeExecutions;
   constants: typeof constants;
   http: typeof http;
   lemonSqueezy: typeof lemonSqueezy;
+  pistonHealth: typeof pistonHealth;
   rateLimit: typeof rateLimit;
   snippets: typeof snippets;
   users: typeof users;
